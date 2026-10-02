@@ -1,0 +1,8 @@
+# Core
+mss>=9.0.1
+numpy>=1.24
+requests>=2.28
+
+# Optional: much faster screen grabbing on Windows (Desktop Duplication, 200+ fps).
+# Not required - the app falls back to mss automatically.
+# bettercam>=1.0.0

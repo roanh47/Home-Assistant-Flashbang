@@ -50,7 +50,7 @@ flashbang lasts 1–4 seconds, so it feels synced, but it is not a 1:1 video lin
 git clone https://github.com/roanh47/Home-Assistant-Flashbang.git
 cd Home-Assistant-Flashbang
 python -m pip install -r requirements.txt
-python flashbang.py
+python Home-Assistant-Flashbang.py
 ```
 
 Or double-click **`run.bat`** (starts it without a console window).

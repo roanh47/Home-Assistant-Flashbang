@@ -17,6 +17,7 @@ Nothing here needs a display, a real Home Assistant or real lamps.
 Run:  python -m unittest tests.test_integration -v
 """
 
+import importlib.util
 import json
 import os
 import queue
@@ -26,9 +27,14 @@ import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import flashbang as fb  # noqa: E402
+# The app is "Home-Assistant-Flashbang.py" - a dashed filename cannot be
+# imported by name, so it is loaded from its path.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_spec = importlib.util.spec_from_file_location(
+    "flashbang", os.path.join(ROOT, "Home-Assistant-Flashbang.py"))
+fb = importlib.util.module_from_spec(_spec)
+sys.modules["flashbang"] = fb
+_spec.loader.exec_module(fb)
 
 try:
     import requests  # noqa: F401

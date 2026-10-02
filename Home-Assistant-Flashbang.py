@@ -12,8 +12,8 @@ what they were before.
 This is a *trigger*, not Hue Sync: nothing is mirrored continuously, the lights
 only jump when a white flash is detected.
 
-Run:   pythonw flashbang.py     (no console window)
-       python  flashbang.py     (with console, useful for errors)
+Run:   pythonw Home-Assistant-Flashbang.py   (no console window)
+       python  Home-Assistant-Flashbang.py   (with console, useful for errors)
 
 Requires: Python 3.9+, `mss`, `numpy`, `requests`. Tkinter ships with Python.
 """

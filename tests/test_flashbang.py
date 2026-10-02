@@ -10,6 +10,7 @@ No display, no Home Assistant and no Windows needed: the capture layer is the
 only thing that is not covered here, everything around it is.
 """
 
+import importlib.util
 import json
 import os
 import sys
@@ -17,9 +18,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import flashbang as fb  # noqa: E402
+# The app is "Home-Assistant-Flashbang.py" - a dashed filename cannot be
+# imported by name, so it is loaded from its path.
+ROOT = Path(__file__).resolve().parent.parent
+_spec = importlib.util.spec_from_file_location(
+    "flashbang", str(ROOT / "Home-Assistant-Flashbang.py"))
+fb = importlib.util.module_from_spec(_spec)
+sys.modules["flashbang"] = fb
+_spec.loader.exec_module(fb)
 
 
 # --------------------------------------------------------------------------- #

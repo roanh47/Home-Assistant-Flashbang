@@ -76,6 +76,7 @@ class Settings:
     monitor: int = 0
     entities: list = field(default_factory=list)
     mode: str = "current"          # "current" = restore what was there, "off" = lamps are off
+    off_on_start: bool = True       # mode "off": switch the lamps off the moment watching starts
     white_threshold: float = 235.0  # mean luminance (0-255) from which the screen counts as white
     white_ratio: float = 0.85       # fraction of pixels that must be near-white
     jump: float = 55.0              # required rise of the mean luminance vs. the frames before
@@ -95,6 +96,7 @@ class Settings:
             "monitor": int(self.monitor),
             "entities": list(self.entities),
             "mode": self.mode,
+            "off_on_start": bool(self.off_on_start),
             "white_threshold": float(self.white_threshold),
             "white_ratio": float(self.white_ratio),
             "jump": float(self.jump),
@@ -604,6 +606,7 @@ class Controller:
         self.events = events
         self._stop = threading.Event()
         self._test = threading.Event()
+        self._wake = threading.Event()
         self._thread = None
         self._client = None
         self._client_key = None
@@ -622,8 +625,10 @@ class Controller:
 
     def stop(self, wait: float = 2.0) -> None:
         self._stop.set()
+        self._wake.set()        # wake the loop if it is in the middle of its pause
         if self._thread:
             self._thread.join(timeout=wait)
+        self._thread = None
 
     def test_flash(self) -> None:
         self._test.set()
@@ -660,6 +665,12 @@ class Controller:
             return
 
         self._log("Reading monitor %d via %s." % (self.s.monitor + 1, backend))
+
+        # Mode "off": the lamps must be dark from the moment we start watching,
+        # not only after the first flash.
+        if self.s.mode == "off" and self.s.off_on_start:
+            self.set_off()
+
         detector = FlashDetector(self.s)
         frame_dt = 1.0 / max(5.0, float(self.s.fps_target))
         last = time.perf_counter()
@@ -704,10 +715,30 @@ class Controller:
 
             spent = time.perf_counter() - loop_start
             if spent < frame_dt:
-                time.sleep(frame_dt - spent)
+                self._wake.wait(frame_dt - spent)
+                self._wake.clear()
 
         grab.close()
         self._emit({"type": "stopped"})
+
+    # -- lamps ------------------------------------------------------------ #
+    def selected(self) -> list:
+        """The entity_ids the user ticked."""
+        return [e for e in (self.s.entities or []) if e]
+
+    def set_off(self) -> bool:
+        """Turn the selected lamps off (mode "off": they are dark while watching)."""
+        entities = self.selected()
+        if not entities:
+            return False
+        client = self._client_for()
+        if client is None:
+            return False
+        if client.turn_off(entities, transition=self.s.fade):
+            self._log("Lamps switched off - they stay dark until a flash.")
+            return True
+        self._log("Could not switch the lamps off.", "error")
+        return False
 
     def _flash(self) -> None:
         entities = [e for e in (self.s.entities or []) if e]
@@ -957,6 +988,10 @@ class FlashbangApp:
         ttk.Radiobutton(card, value="off", variable=self.mode_var,
                         text="Off  -  the lamps are off, white on a flash, off again "
                              "afterwards").pack(anchor="w", pady=(2, 0))
+        self.off_on_start_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(card, variable=self.off_on_start_var,
+                        text="Switch them off the moment I press Start"
+                        ).pack(anchor="w", padx=(22, 0), pady=(3, 0))
 
         # --- detection --------------------------------------------------- #
         card = self._card(outer, "Detection")
@@ -1029,6 +1064,7 @@ class FlashbangApp:
         self.url_var.set(s.hass_url)
         self.token_var.set(s.token)
         self.mode_var.set(s.mode if s.mode in ("current", "off") else "current")
+        self.off_on_start_var.set(bool(s.off_on_start))
         self.threshold_var.set(s.white_threshold)
         self.ratio_var.set(s.white_ratio * 100)
         self.hold_var.set(s.hold)
@@ -1040,6 +1076,7 @@ class FlashbangApp:
         s.hass_url = self.url_var.get().strip()
         s.token = self.token_var.get().strip()
         s.mode = self.mode_var.get()
+        s.off_on_start = bool(self.off_on_start_var.get())
         s.white_threshold = float(self.threshold_var.get())
         s.white_ratio = float(self.ratio_var.get()) / 100.0
         s.hold = float(self.hold_var.get())

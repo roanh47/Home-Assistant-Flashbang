@@ -134,6 +134,10 @@ class TestSettings(unittest.TestCase):
         for mode in ("current", "off"):
             self.assertEqual(fb.Settings.from_dict({"mode": mode}).mode, mode)
 
+    def test_off_on_start_defaults_to_on_and_survives(self):
+        self.assertTrue(fb.Settings().off_on_start)
+        self.assertFalse(fb.Settings.from_dict({"off_on_start": False}).off_on_start)
+
 
 # --------------------------------------------------------------------------- #
 # helpers

@@ -95,8 +95,10 @@ plain text, like most local tools — that file stays on your own machine.
   flash (colour, brightness, temperature, effect), fires white, then puts
   everything back. Best for lamps that are usually on; a lamp that was dim and
   warm goes back to dim and warm.
-- **Off** — for lamps that are normally off. They turn on full white at the
-  flash, then go off again with the same fade.
+- **Off** — for lamps that are normally off. They go off **the moment you press
+  Start** (untick the checkbox if you would rather they stay as they are until
+  the first flash), turn on full white at the flash, then go off again with the
+  same fade.
 
 ---
 
@@ -174,11 +176,11 @@ Produces `dist\Flashbang.exe` (no console window). Drop a shortcut in
 python -m unittest discover -s tests -v
 ```
 
-51 tests: the flash detector (jump detection, cooldown, re-arming, warm-up),
+57 tests: the flash detector (jump detection, cooldown, re-arming, warm-up),
 the light payloads per colour mode, the snapshot/restore round-trip, config
-handling, and a full end-to-end flash sequence against a real local HTTP server
-that speaks the Home Assistant API. No display, Home Assistant or lamps
-required.
+handling, what Start/Stop does to the lamps in each mode, and a full end-to-end
+flash sequence against a real local HTTP server that speaks the Home Assistant
+API. No display, Home Assistant or lamps required.
 
 ## License
 

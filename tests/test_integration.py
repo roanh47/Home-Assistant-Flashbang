@@ -223,6 +223,92 @@ class FlashSequenceTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_REQUESTS, "the 'requests' module is not installed")
+class StartWatchingTests(unittest.TestCase):
+    """Pressing Start with the 'off' mode must darken the lamps straight away."""
+
+    def setUp(self):
+        self.server = FakeHomeAssistant()
+        self.addCleanup(self.server.close)
+        real = fb.ScreenGrabber
+        fb.ScreenGrabber = _FakeGrabber
+        self.addCleanup(lambda: setattr(fb, "ScreenGrabber", real))
+
+    def controller(self, **kw):
+        settings = fb.Settings(hass_url=self.server.url, token="test-token",
+                               entities=["light.bureau", "light.plafond"],
+                               fade=0.3, fps_target=30.0)
+        for key, value in kw.items():
+            setattr(settings, key, value)
+        ctrl = fb.Controller(settings, queue.Queue())
+        self.addCleanup(ctrl.stop)
+        return ctrl
+
+    def wait_for_a_call(self, timeout=3.0):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            calls = self.server.service_calls()
+            if calls:
+                return calls
+            time.sleep(0.02)
+        return []
+
+    def test_start_in_off_mode_switches_the_lamps_off(self):
+        ctrl = self.controller(mode="off")
+        ctrl.start()
+        calls = self.wait_for_a_call()
+        self.assertTrue(calls, "Start in 'off' mode never switched the lamps off")
+        path, payload = calls[0]
+        self.assertTrue(path.endswith("/turn_off"), path)
+        self.assertEqual(entities_in(calls[0]), {"light.bureau", "light.plafond"})
+        self.assertEqual(payload["transition"], 0.3)
+
+    def test_start_in_off_mode_does_not_wait_for_a_flash(self):
+        self.controller(mode="off").start()
+        self.wait_for_a_call()
+        # turn_off only: no /api/states read, so this is not a flash in disguise
+        self.assertEqual(self.server.paths(), ["/api/services/light/turn_off"])
+
+    def test_start_in_current_mode_leaves_the_lamps_alone(self):
+        self.controller(mode="current").start()
+        time.sleep(0.5)
+        self.assertEqual(self.server.service_calls(), [])
+
+    def test_unchecking_it_leaves_the_lamps_alone(self):
+        self.controller(mode="off", off_on_start=False).start()
+        time.sleep(0.5)
+        self.assertEqual(self.server.service_calls(), [])
+
+    def test_stop_returns_promptly(self):
+        ctrl = self.controller(mode="off", fps_target=60.0)
+        ctrl.start()
+        self.wait_for_a_call()
+        started = time.perf_counter()
+        ctrl.stop()
+        self.assertLess(time.perf_counter() - started, 0.5)
+
+
+class _FakeGrabber:
+    """Stands in for the screen so the watching loop can run headless.
+
+    It always reports a dark screen, so no flash can be triggered: every call
+    the server sees in these tests comes from the start/stop path.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def open(self):
+        return "fake"
+
+    def stats(self):
+        time.sleep(0.005)
+        return (40.0, 0.002)
+
+    def close(self):
+        pass
+
+
+@unittest.skipUnless(HAVE_REQUESTS, "the 'requests' module is not installed")
 class ConnectionTests(unittest.TestCase):
     """The 'Connect / load lamps' path, without needing Home Assistant."""
 
